@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ETL Pipeline UI</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            color: #4A90E2;
+        }
+        button {
+            background-color: #4A90E2;
+            color: #fff;
+            border: none;
+            padding: 10px 15px;
+            margin: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #357ABD;
+        }
+        .output-container {
+            margin-top: 20px;
+            width: 90%;
+            text-align: left;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .status {
+            margin-top: 20px;
+            font-weight: bold;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table th, table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        table th {
+            background-color: #4A90E2;
+            color: white;
+        }
+        .table-container {
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+    <h1>ETL Pipeline Dashboard</h1>
+
+    <!-- Buttons -->
+    <button onclick="extractData()">Extract</button>
+    <button onclick="transformData()">Transform</button>
+    <button onclick="loadData()">Load</button>
+
+    <!-- Output Section -->
+    <div class="output-container">
+        <div id="status" class="status">Status: Waiting for action...</div>
+        <div id="data" class="table-container"></div>
+    </div>
+
+    <script>
+        function updateStatus(message) {
+            document.getElementById("status").innerText = `Status: ${message}`;
+        }
+
+        function displayTable(data, tableHeading) {
+            let tableHtml = `<h3>${tableHeading}</h3><table><tr>`;
+            if (data.length > 0) {
+                // Add table headings
+                Object.keys(data[0]).forEach((key) => {
+                    tableHtml += `<th>${key}</th>`;
+                });
+                tableHtml += "</tr>";
+
+                // Add table rows
+                data.forEach((row) => {
+                    tableHtml += "<tr>";
+                    Object.values(row).forEach((value) => {
+                        tableHtml += `<td>${value}</td>`;
+                    });
+                    tableHtml += "</tr>";
+                });
+            } else {
+                tableHtml += "<tr><td>No data available</td></tr>";
+            }
+            tableHtml += "</table>";
+            return tableHtml;
+        }
+
+        function extractData() {
+            updateStatus("Extracting data...");
+            fetch("/extract", { method: "POST" })
+                .then((response) => response.json())
+                .then((data) => {
+                    updateStatus("Data extracted successfully!");
+
+                    // Display the GPS and Route Schedule tables
+                    const dataDiv = document.getElementById("data");
+                    let tablesHtml = displayTable(data.gps_data, "GPS Data (JSON)") +
+                                     displayTable(data.route_schedule, "Route Schedule (CSV)");
+                    dataDiv.innerHTML = tablesHtml;
+                })
+                .catch((error) => {
+                    updateStatus("Error extracting data.");
+                    console.error(error);
+                });
+        }
+
+        function transformData() {
+            updateStatus("Transforming data...");
+            fetch("/transform", { method: "POST" })
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.status === "success") {
+                        updateStatus("Transformation completed successfully!");
+                    } else {
+                        updateStatus(`Transformation failed: ${data.message}`);
+                    }
+                })
+                .catch((error) => {
+                    updateStatus("Error during transformation.");
+                    console.error(error);
+                });
+        }
+
+        function loadData() {
+            updateStatus("Loading data...");
+            fetch("/load", { method: "POST" })
+                .then((response) => response.json())
+                .then((data) => {
+                    updateStatus("Data loaded successfully!");
+
+                    // Define the desired column order
+                    const desiredColumnOrder = [
+                        "bus_id", "route_id", "stop_id", "stop_name", "scheduled_time", "actual_arrival_time", "approximate_arrival_time", "distance_km"
+                    ];
+
+                    // Reorder the rows based on the desired column order
+                    const orderedData = data.output_data.map(row => {
+                        const orderedRow = {};
+                        desiredColumnOrder.forEach(col => {
+                            orderedRow[col] = row[col];
+                        });
+                        return orderedRow;
+                    });
+
+                    // Now call displayTable with the ordered data
+                    const dataDiv = document.getElementById("data");
+                    dataDiv.innerHTML = displayTable(orderedData, "Output Data (Parquet)");
+                })
+                .catch((error) => {
+                    updateStatus("Error loading data.");
+                    console.error(error);
+                });
+        }
+    </script>
+</body>
+</html>
