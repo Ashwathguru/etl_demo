@@ -1,7 +1,3 @@
-Here’s a detailed README file for your project:
-
----
-
 # Live Transportation Delay Tracking Application
 
 ## Overview
